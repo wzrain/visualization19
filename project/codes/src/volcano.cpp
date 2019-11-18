@@ -22,6 +22,9 @@
 #include <vtkOpenGLGPUVolumeRayCastMapper.h>
 #include <vtkVolumeProperty.h>
 #include <vtkCamera.h>
+#include <vtkPointData.h>
+#include <vtkXMLImageDataReader.h>
+#include <vtkDataSetMapper.h>
 
 void readVTKFile()
 {
@@ -29,44 +32,41 @@ void readVTKFile()
 	vtkSmartPointer<vtkRenderWindow> renWin = vtkSmartPointer<vtkRenderWindow>::New();
 	renWin->AddRenderer(renderer);
 
+	vtkSmartPointer<vtkRenderWindowInteractor> renWinInteractor = vtkSmartPointer<vtkRenderWindowInteractor>::New();
+	renWinInteractor->SetRenderWindow(renWin);
 
-	vtkSmartPointer<vtkRenderWindowInteractor> iren = vtkSmartPointer<vtkRenderWindowInteractor>::New();
-	iren->SetRenderWindow(renWin);
+	vtkSmartPointer<vtkPolyDataReader> reader = vtkSmartPointer<vtkPolyDataReader>::New();
+	reader->SetFileName("D:\\documents\\visualization\\project\\Volcanoes\\airs\\volcano_2011_150_am.vtk");
+	reader->Update();
 
-
-	vtkSmartPointer<vtkPolyDataReader> vtkReader = vtkSmartPointer<vtkPolyDataReader>::New();
-	vtkReader->SetFileName("D:\\documents\\visualization\\project\\Volcanoes\\airs\\volcano_2011_150_am.vtk");
-
+	vtkSmartPointer<vtkPolyData> data = reader->GetOutput();
+	cout << data->GetPointData()->GetArrayName(1) << endl;
+	auto ashIndex = data->GetPointData()->GetArray("ash");
+	data->GetPointData()->SetScalars(ashIndex);
 
 	vtkSmartPointer<vtkPolyDataMapper> mapper = vtkSmartPointer<vtkPolyDataMapper>::New();
-	mapper->SetInputConnection(vtkReader->GetOutputPort());
-	mapper->ScalarVisibilityOff();
-
+	mapper->SetInputConnection(reader->GetOutputPort());
+	//mapper->ScalarVisibilityOff();
 
 	vtkSmartPointer<vtkActor> actor = vtkSmartPointer<vtkActor>::New();
 	actor->SetMapper(mapper);
 
-
 	vtkSmartPointer<vtkCamera> aCamera = vtkSmartPointer<vtkCamera>::New();
-	aCamera->SetViewUp(0, 0, -1);
-	aCamera->SetPosition(0, 1, 0);
+	aCamera->SetViewUp(0, 1, 0);
+	aCamera->SetPosition(0, 0, 1);
 	aCamera->SetFocalPoint(0, 0, 0);
 	aCamera->ComputeViewPlaneNormal();
-	aCamera->Azimuth(30.0);
-	aCamera->Elevation(30.0);
-	aCamera->Dolly(1.5);
-
 
 	renderer->AddActor(actor);
 	renderer->SetActiveCamera(aCamera);
 	renderer->ResetCamera();
-	renderer->SetBackground(.2, .3, .4);
+	renderer->SetBackground(.5, .5, .5);
 	renderer->ResetCameraClippingRange();
 
-
+	renWin->SetSize(600, 600);
 	renWin->Render();
-	iren->Initialize();
-	iren->Start();
+	renWinInteractor->Initialize();
+	renWinInteractor->Start();
 }
 
 int main()
