@@ -50,7 +50,7 @@ void getColorCorrespondingTovalue(double val, double &r, double &g, double &b)
 	static const int numColorNodes = 9;
 	double color[numColorNodes][3] =
 	{
-		247/255.0,251/255.0,255/255.0,
+		255/255.0,255/255.0,255/255.0,
 		222/255.0,235/255.0,247/255.0,
 		198/255.0,219/255.0,239/255.0,
 		158/255.0,202/255.0,225/255.0,
@@ -134,7 +134,7 @@ void readVTKFile(const char *fileName,const char *attribute)
 		std::cout << trajs->GetNumberOfTuples() << std::endl;
 		// long timeStart = long(1 << 28) * long(100);
 		// long timeEnd = 0;
-		long timeThreshold = timeStartHour(24*10);
+		long timeThreshold = timeStartHour(1);
 		for(int i = 0; i < trajs->GetNumberOfTuples(); i++){
 			int pointNum = data->GetCell(i)->GetPointIds()->GetNumberOfIds();
 			// std::cout << pointNum << std::endl;
@@ -157,38 +157,6 @@ void readVTKFile(const char *fileName,const char *attribute)
 			// std::cout << "================\n";
 		}
 		// std::cout << long(timeStart) << ' ' << long(timeEnd) << std::endl;
-
-		// std::cout << trajs->GetNumberOfOffsets() << std::endl;
-		// std::cout << trajs->GetNumberOfConnectvityIds() << std::endl;
-		// auto seedId = data->GetCellData()->vtkCellDataToPointData();
-		// auto seedId = data->GetPointData()->GetArray("seedId");
-		// auto fuck = data->GetPointData()->GetArray("fuck");
-		// std::vector<double> timeV;
-		// std::vector<double> altitudeV;
-		// std::vector<double> pressureV;
-		// std::vector<double> temperatureV;
-		// std::vector<double> potTemperatureV;
-		// std::vector<double> potVorticityV;
-		// std::vector<double> seedIdV;
-		// for(int i = 0; i < 10000; i++){
-			// std::cout << "Tuple: " << i << std::endl;
-		// 	timeV.push_back(time->GetTuple1(i)); std::cout << " time: " << timeV.back() << std::endl;
-		// 	altitudeV.push_back(altitude->GetTuple1(i)); std::cout << " altitude: " << altitudeV.back() << std::endl;
-		// 	pressureV.push_back(pressure->GetTuple1(i)); std::cout << " pressure: " << pressureV.back() << std::endl;
-		// 	temperatureV.push_back(temperature->GetTuple1(i)); std::cout << " temperature: " << temperatureV.back() << std::endl;
-		// 	potTemperatureV.push_back(potTemperature->GetTuple1(i)); std::cout << " potTemperature: " << potTemperatureV.back() << std::endl;
-			// std::cout << *(potVorticity->GetTuple2(i)) << std::endl;
-			// potVorticityV.push_back(potVorticity->GetTuple1(i)); std::cout << " potVorticity: " << potVorticityV.back() << std::endl;
-			// seedIdV.push_back(seedId->GetTuple1(i)); std::cout << " seedId: " << seedIdV.back() << std::endl;
-		// }
-		// std::cout << "time:  type - " << typeid(time).name() << "    elementNum - " << time->GetElementComponentSize() << std::endl;
-		// std::cout << "altitude:  type - " << typeid(altitude).name() << "    elementNum - " << altitude->GetNumberOfTuples() << std::endl;
-		// std::cout << altitude->GetTuple1(0) << std::endl;
-		// std::cout << "pressure:  type - " << typeid(pressure).name() << "    elementNum - " << pressure->GetElementComponentSize() << std::endl;
-		// std::cout << "temperature:  type - " << typeid(temperature).name() << "    elementNum - " << temperature->GetElementComponentSize() << std::endl;
-		// std::cout << "potTemperature:  type - " << typeid(potTemperature).name() << "    elementNum - " << potTemperature->GetElementComponentSize() << std::endl;
-		// std::cout << "potVorticity:  type - " << typeid(potVorticity).name() << "    elementNum - " << potVorticity->GetElementComponentSize() << std::endl;
-		// std::cout << "seedId:  type - " << typeid(seedId).name() << "    elementNum - " << seedId->GetElementComponentSize() << std::endl;
 		// data->GetPointData()->SetScalars(time);
 		// data->GetPointData()->SetScalars(altitude);
 		// data->GetPointData()->SetScalars(pressure);
@@ -211,7 +179,8 @@ void readVTKFile(const char *fileName,const char *attribute)
 	{
 		double val = min + ((double)i / numColors) * range;
 		getColorCorrespondingTovalue(val, r, g, b);
-		lookupTable->SetTableValue(i, r, g, b);
+		if(r == 1 and g == 1 and b == 1){lookupTable->SetTableValue(i, r, g, b, 0.0);}
+		else{lookupTable->SetTableValue(i, r, g, b, 1.0);}
 	}	
 
 	vtkSmartPointer <vtkScalarBarActor> legend = vtkScalarBarActor::New();
