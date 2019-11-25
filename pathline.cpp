@@ -134,13 +134,29 @@ void readVTKFile(const char *fileName,const char *attribute)
 		std::cout << trajs->GetNumberOfTuples() << std::endl;
 		// long timeStart = long(1 << 28) * long(100);
 		// long timeEnd = 0;
-		long timeThreshold = timeStartHour(1);
+		double co[3];
+		data->GetPoints()->GetPoint(1,co);
+		long timeThresholdUp = timeStartHour(24*1);
+		long timeThresholdDown = timeStartHour(0);
 		for(int i = 0; i < trajs->GetNumberOfTuples(); i++){
 			int pointNum = data->GetCell(i)->GetPointIds()->GetNumberOfIds();
 			// std::cout << pointNum << std::endl;
+			bool add = false;
+			int addCnt = 0;
+			std::vector<double> PTime;
+			std::vector<vtkIdType> PIdx;
+			std::vector<double> PY;
 			for(int j = 0; j < pointNum; j++){
 				float pTime = time->GetTuple1(data->GetCell(i)->GetPointId(j));
-				if(pTime < timeThreshold){
+				if(pTime < timeThresholdUp and pTime > timeThresholdDown){
+					// double co[3];
+					// data->GetPoints()->GetPoint(data->GetCell(i)->GetPointId(j),co);
+					// PTime.push_back(trajs->GetTuple1(i));
+					// PIdx.push_back(data->GetCell(i)->GetPointId(j));
+					// if(!add and PY.size()){
+					// 	if(std::abs(co[1] - PY.back()) > 3){add = true;}
+					// }
+					// PY.push_back(co[1]);
 					idx->SetValue(data->GetCell(i)->GetPointId(j),trajs->GetTuple1(i));
 				}
 				// if(pTime == 0){std::cout << i << ' ' << j << std::endl;}
@@ -148,6 +164,11 @@ void readVTKFile(const char *fileName,const char *attribute)
 				// if(timeStart > pTime){timeStart = pTime;}
 				// if(timeEnd < pTime){timeEnd = pTime;}
 			}
+			// if(add){
+			// 	for(int j = 0; j < PTime.size(); j++){
+			// 		idx->SetValue(PIdx[j],PTime[j]);
+			// 	}
+			// }
 			// std::cout << i << ' ' << trajs->GetTuple1(i) << std::endl;
 			// std::cout << i << ' ' << data->GetCell(i)->GetCellType() << std::endl;
 			// // std::cout << i << ' ' << data->GetCell(i)->GetPoints()->GetNumberOfPoints() << std::endl;
@@ -175,8 +196,7 @@ void readVTKFile(const char *fileName,const char *attribute)
 	lookupTable->SetScaleToLinear();
 	lookupTable->SetNumberOfTableValues(numColors);
 	double r, g, b;
-	for (int i = 0; i < numColors; i++)
-	{
+	for (int i = 0; i < numColors; i++){
 		double val = min + ((double)i / numColors) * range;
 		getColorCorrespondingTovalue(val, r, g, b);
 		if(r == 1 and g == 1 and b == 1){lookupTable->SetTableValue(i, r, g, b, 0.0);}
