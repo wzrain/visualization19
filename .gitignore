@@ -1,3 +1,4 @@
 /build
+/src
 CMakeLists.txt
 aerosol_in_stratosphere.cpp

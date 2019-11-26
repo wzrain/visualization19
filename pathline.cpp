@@ -143,12 +143,12 @@ void readVTKFile(const char *fileName,const char *attribute)
 		// long timeEnd = 0;
 		double co[3];
 		data->GetPoints()->GetPoint(1,co);
-		long timeThresholdUp = timeStartHour(24);
+		long timeThresholdUp = timeStartHour(15*24);
 		// long timeThresholdStart = timeStartHour(0);
 		long timeThresholdDown = timeStartHour(0);
 		// std::unordered_set<vtkIdType> visited;
 		for(int i = 0; i < trajs->GetNumberOfTuples(); i++){
-			if(i > 5000){break;}
+			// if(i > 5000){break;}
 			// if(i % 5000 == 0){std::cout << i << std::endl;}
 			int pointNum = data->GetCell(i)->GetPointIds()->GetNumberOfIds();
 			// std::cout << pointNum << std::endl;
@@ -182,7 +182,7 @@ void readVTKFile(const char *fileName,const char *attribute)
 					PX.push_back(co[0]);
 					PY.push_back(co[1]);
 					// visited.insert(data->GetCell(i)->GetPointId(j));
-					idx->SetValue(data->GetCell(i)->GetPointId(j),trajs->GetTuple1(i));
+					// idx->SetValue(data->GetCell(i)->GetPointId(j),trajs->GetTuple1(i));
 				}
 				// if(pTime == 0){std::cout << i << ' ' << j << std::endl;}
 				// times[i].push_back(pTime);
