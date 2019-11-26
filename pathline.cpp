@@ -35,8 +35,13 @@
 #include <iostream>
 #include <vector>
 #include <string>
+#include <unordered_set>
 
 //https://math.stackexchange.com/questions/915290/find-vector-field-given-curl
+
+// Nabro:                 13'22'' N    41'42'' E
+// Grímsvötn:             64°25′12″N   17°19′48″W
+// Puyehue-Cordón Caulle: 40°35′25″S   72°07′02″W
 
 static const double min = 0;
 static const double max = 650;
@@ -44,6 +49,8 @@ static const double range = max-min;
 static const double numColors = 100;
 static const long timeStart = 360460800;
 static const long timeEnd = 367664384;
+// static const long timeStart = 361217800;
+// static const long timeEnd = 368582384;
 
 void getColorCorrespondingTovalue(double val, double &r, double &g, double &b)
 {
@@ -136,27 +143,45 @@ void readVTKFile(const char *fileName,const char *attribute)
 		// long timeEnd = 0;
 		double co[3];
 		data->GetPoints()->GetPoint(1,co);
-		long timeThresholdUp = timeStartHour(24*1);
+		long timeThresholdUp = timeStartHour(24);
+		// long timeThresholdStart = timeStartHour(0);
 		long timeThresholdDown = timeStartHour(0);
+		// std::unordered_set<vtkIdType> visited;
 		for(int i = 0; i < trajs->GetNumberOfTuples(); i++){
+			if(i > 5000){break;}
+			// if(i % 5000 == 0){std::cout << i << std::endl;}
 			int pointNum = data->GetCell(i)->GetPointIds()->GetNumberOfIds();
 			// std::cout << pointNum << std::endl;
-			bool add = false;
-			int addCnt = 0;
+			// bool add = false;
+			// int addCnt = 0;
 			std::vector<double> PTime;
 			std::vector<vtkIdType> PIdx;
+			std::vector<double> PX;
 			std::vector<double> PY;
+			// std::vector<long> ttv;
+			// std::unordered_set<long> tts;
+			bool near = false;
 			for(int j = 0; j < pointNum; j++){
-				float pTime = time->GetTuple1(data->GetCell(i)->GetPointId(j));
+				float pTime = time->GetTuple1(data->GetCell(i)->GetPointId(j)); 
+				
+				// if(!i){
+				// 	ttv.push_back(pTime);  tts.insert(pTime);
+				// }
+				double co[3];
+				data->GetPoints()->GetPoint(data->GetCell(i)->GetPointId(j),co);
+				// if(co[3] < 0){break;}
 				if(pTime < timeThresholdUp and pTime > timeThresholdDown){
+					if(!near and co[0] > -73 and co[0] < -72 and co[1] > -41 and co[1] < -40){near = true;}
 					// double co[3];
 					// data->GetPoints()->GetPoint(data->GetCell(i)->GetPointId(j),co);
-					// PTime.push_back(trajs->GetTuple1(i));
-					// PIdx.push_back(data->GetCell(i)->GetPointId(j));
+					PTime.push_back(trajs->GetTuple1(i));
+					PIdx.push_back(data->GetCell(i)->GetPointId(j));
 					// if(!add and PY.size()){
 					// 	if(std::abs(co[1] - PY.back()) > 3){add = true;}
 					// }
-					// PY.push_back(co[1]);
+					PX.push_back(co[0]);
+					PY.push_back(co[1]);
+					// visited.insert(data->GetCell(i)->GetPointId(j));
 					idx->SetValue(data->GetCell(i)->GetPointId(j),trajs->GetTuple1(i));
 				}
 				// if(pTime == 0){std::cout << i << ' ' << j << std::endl;}
@@ -164,6 +189,14 @@ void readVTKFile(const char *fileName,const char *attribute)
 				// if(timeStart > pTime){timeStart = pTime;}
 				// if(timeEnd < pTime){timeEnd = pTime;}
 			}
+			if(near){
+				for(int j = 0; j < PTime.size(); j++){
+					if(PX[j] > -160 and PX[j] < 160){
+						idx->SetValue(PIdx[j],PTime[j]);
+					}
+				}
+			}
+			// if(!i) std::cout << ttv.size() - tts.size() << std::endl;
 			// if(add){
 			// 	for(int j = 0; j < PTime.size(); j++){
 			// 		idx->SetValue(PIdx[j],PTime[j]);
