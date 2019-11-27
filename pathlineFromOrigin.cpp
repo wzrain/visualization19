@@ -12,6 +12,8 @@
 #include <vtkTexturedButtonRepresentation2D.h>
 #include <vtkUnstructuredGridReader.h>
 #include <vtkUnstructuredGrid.h>
+#include <vtkStructuredGridReader.h>
+#include <vtkStructuredGridGeometryFilter.h>
 #include <vtkUnstructuredGridGeometryFilter.h>
 #include <vtkSmartPointer.h>
 #include <vtkMetaImageReader.h>
@@ -57,7 +59,7 @@ static const double Y = -40.0f; // P
 // static const double X = 41.0f; // N
 // static const double Y = 13.0f; // N
 static const double delta = 1.0f;
-static const double timeDelta = 3600;
+static const double timeDelta = 6*3600;
 
 void getColorCorrespondingTovalue(double val, double &r, double &g, double &b)
 {
@@ -103,6 +105,24 @@ void readVTKFile(const char *fileName,const char *attribute)
 	vtkSmartPointer<vtkRenderWindowInteractor> renWinInteractor = vtkSmartPointer<vtkRenderWindowInteractor>::New();
 	renWinInteractor->SetRenderWindow(renWin);
 
+	vtkSmartPointer<vtkStructuredGridReader> earthReader = vtkSmartPointer<vtkStructuredGridReader>::New();
+	earthReader->SetFileName("../../../support/earth_texture.vtk");
+	earthReader->Update();
+	vtkSmartPointer<vtkStructuredGridGeometryFilter> geometryFilter = vtkSmartPointer<vtkStructuredGridGeometryFilter>::New();
+	geometryFilter->SetInputConnection(earthReader->GetOutputPort());
+	geometryFilter->Update();
+	vtkSmartPointer<vtkPolyData> earthdata = geometryFilter->GetOutput();
+	for (int i = 0; i < earthdata->GetNumberOfPoints(); i++)
+	{
+		double co[3];
+		earthdata->GetPoints()->GetPoint(i, co);
+		earthdata->GetPoints()->SetPoint(i, co[0], co[1], -0.1);
+	}
+	vtkSmartPointer<vtkPolyDataMapper> BGmapper = vtkSmartPointer<vtkPolyDataMapper>::New();
+	BGmapper->SetInputData(earthdata);
+	vtkSmartPointer<vtkActor> BGactor = vtkSmartPointer<vtkActor>::New();
+	BGactor->SetMapper(BGmapper);
+
 	vtkSmartPointer<vtkPolyDataReader> reader = vtkSmartPointer<vtkPolyDataReader>::New();
 	if(std::string(fileName) == std::string("")){
 		// reader->SetFileName("../../../clams/CLaMS_Nabro.vtk");
@@ -126,7 +146,7 @@ void readVTKFile(const char *fileName,const char *attribute)
 		// auto potVorticity = data->GetPointData()->GetArray("pot_vorticity");
 		auto trajs = data->GetCellData()->GetArray("seed_id"); // the cell type is VTK_POLY_LINE
 
-		long timeThresholdUp = timeStartHour(5*24);
+		long timeThresholdUp = timeStartHour(10*24);
 		long timeThresholdDown = timeStartHour(0);
 		// std::unordered_set<vtkIdType> visited;
 		for(int i = 0; i < trajs->GetNumberOfTuples(); i++){
@@ -151,7 +171,7 @@ void readVTKFile(const char *fileName,const char *attribute)
 			}
 			if(near){
 				for(int j = 0; j < PTime.size(); j++){
-					if(PX[j] > -160 and PX[j] < 160){
+					if(PX[j] > -170 and PX[j] < 170){
 						idx->SetValue(PIdx[j],PTime[j]);
 					}
 				}
@@ -198,6 +218,7 @@ void readVTKFile(const char *fileName,const char *attribute)
 	aCamera->ComputeViewPlaneNormal();
 
 	renderer->AddActor(actor);
+	renderer->AddActor(BGactor);
 	renderer->AddActor2D(legend);
 	renderer->SetActiveCamera(aCamera);
 	renderer->ResetCamera();

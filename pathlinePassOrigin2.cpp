@@ -13,8 +13,6 @@
 #include <vtkUnstructuredGridReader.h>
 #include <vtkUnstructuredGrid.h>
 #include <vtkUnstructuredGridGeometryFilter.h>
-#include <vtkStructuredGridReader.h>
-#include <vtkStructuredGridGeometryFilter.h>
 #include <vtkSmartPointer.h>
 #include <vtkMetaImageReader.h>
 #include <vtkMarchingCubes.h>
@@ -45,6 +43,13 @@
 // Grímsvötn:             64°25′12″N   17°19′48″W
 // Puyehue-Cordón Caulle: 40°35′25″S   72°07′02″W
 
+struct P{
+  double trajId;
+  double x, y;
+  vtkIdType pointId;
+  P(void){}
+  P(double ti, double xx, double yy, vtkIdType pi){trajId = ti; x = xx; y = yy; pointId = pi;}
+};
 
 static const double min = 0;
 static const double max = 650;
@@ -59,6 +64,12 @@ static const double Y = -40.0f; // P
 // static const double X = 41.0f; // N
 // static const double Y = 13.0f; // N
 static const double delta = 1.0f;
+static const double timeDelta = 3600 * 5;
+static const double timeGap = 3600 * 24; // one day
+static const int animationStartTime = 0;
+static const int animationEndTime = 25;
+static const int animationTime = animationEndTime - animationStartTime;
+
 
 void getColorCorrespondingTovalue(double val, double &r, double &g, double &b)
 {
@@ -104,24 +115,6 @@ void readVTKFile(const char *fileName,const char *attribute)
 	vtkSmartPointer<vtkRenderWindowInteractor> renWinInteractor = vtkSmartPointer<vtkRenderWindowInteractor>::New();
 	renWinInteractor->SetRenderWindow(renWin);
 
-	vtkSmartPointer<vtkStructuredGridReader> earthReader = vtkSmartPointer<vtkStructuredGridReader>::New();
-	earthReader->SetFileName("../../../support/earth_texture.vtk");
-	earthReader->Update();
-	vtkSmartPointer<vtkStructuredGridGeometryFilter> geometryFilter = vtkSmartPointer<vtkStructuredGridGeometryFilter>::New();
-	geometryFilter->SetInputConnection(earthReader->GetOutputPort());
-	geometryFilter->Update();
-	vtkSmartPointer<vtkPolyData> earthdata = geometryFilter->GetOutput();
-	for (int i = 0; i < earthdata->GetNumberOfPoints(); i++)
-	{
-		double co[3];
-		earthdata->GetPoints()->GetPoint(i, co);
-		earthdata->GetPoints()->SetPoint(i, co[0], co[1], -0.1);
-	}
-	vtkSmartPointer<vtkPolyDataMapper> BGmapper = vtkSmartPointer<vtkPolyDataMapper>::New();
-	BGmapper->SetInputData(earthdata);
-	vtkSmartPointer<vtkActor> BGactor = vtkSmartPointer<vtkActor>::New();
-	BGactor->SetMapper(BGmapper);
-
 	vtkSmartPointer<vtkPolyDataReader> reader = vtkSmartPointer<vtkPolyDataReader>::New();
 	if(std::string(fileName) == std::string("")){
 		// reader->SetFileName("../../../clams/CLaMS_Nabro.vtk");
@@ -145,38 +138,65 @@ void readVTKFile(const char *fileName,const char *attribute)
 		// auto potVorticity = data->GetPointData()->GetArray("pot_vorticity");
 		auto trajs = data->GetCellData()->GetArray("seed_id"); // the cell type is VTK_POLY_LINE
 
-		long timeThresholdUp = timeStartHour(1*24);
+		long timeThresholdUp = timeStartHour(5*24);
 		long timeThresholdDown = timeStartHour(0);
 		// std::unordered_set<vtkIdType> visited;
-		for(int i = 0; i < trajs->GetNumberOfTuples(); i++){
-			int pointNum = data->GetCell(i)->GetPointIds()->GetNumberOfIds();
-			std::vector<double> PTime;
-			std::vector<vtkIdType> PIdx;
-			std::vector<double> PX;
-			std::vector<double> PY;
-			bool near = false;
-			for(int j = 0; j < pointNum; j++){
-				float pTime = time->GetTuple1(data->GetCell(i)->GetPointId(j)); 
-				double co[3];
-				data->GetPoints()->GetPoint(data->GetCell(i)->GetPointId(j),co);
-				if(pTime < timeThresholdUp and pTime > timeThresholdDown){
-					if(!near and std::abs(co[0]-X) < delta and std::abs(co[1]-Y) < delta){near = true;}
-					// if(!near and co[0] > -73 and co[0] < -72 and co[1] > -41 and co[1] < -40){near = true;}
-					PTime.push_back(trajs->GetTuple1(i));
-					PIdx.push_back(data->GetCell(i)->GetPointId(j));
-					PX.push_back(co[0]);
-					PY.push_back(co[1]);
-				}
-			}
-			if(near){
-				for(int j = 0; j < PTime.size(); j++){
-					if(PX[j] > -170 and PX[j] < 170){
-						idx->SetValue(PIdx[j],PTime[j]);
-					}
-				}
-			}
-		}
-		data->GetPointData()->SetScalars(idx);
+		std::vector<std::vector<P>> pointInfo(animationTime+1);
+		// int cnt1 = 0;
+		  for(int i = 0; i < trajs->GetNumberOfTuples(); i++){
+		    int pointNum = data->GetCell(i)->GetPointIds()->GetNumberOfIds();
+		    std::vector<double> PTime;
+		    std::vector<double> TIdx;
+		    std::vector<vtkIdType> PIdx;
+		    std::vector<double> PX;
+		    std::vector<double> PY;
+		    
+		    bool near = false;
+		    // int cnt11 = 0;
+		    for(int j = 0; j < pointNum; j++){
+		      float pTime = time->GetTuple1(data->GetCell(i)->GetPointId(j)); 
+		      double co[3];
+		      data->GetPoints()->GetPoint(data->GetCell(i)->GetPointId(j),co);
+		      if(pTime < timeStart + 7 * timeGap){
+		        if(!near and std::abs(co[0]-X) < delta and std::abs(co[1]-Y) < delta 
+		          and pTime < timeThresholdDown + timeDelta
+		          ){near = true;}
+		        // if(pTime < timeStart + timeGap){cnt11++;}
+		        PTime.push_back(pTime);
+		        TIdx.push_back(trajs->GetTuple1(i));
+		        PIdx.push_back(data->GetCell(i)->GetPointId(j));
+		        PX.push_back(co[0]);
+		        PY.push_back(co[1]);
+		      }
+		    }
+		    if(near){
+		    	// cnt1 += cnt11;
+		    	// std::cout << "cnt1: " << cnt1 << std::endl;
+		    	// int cnt2 = 0;
+		      for(int j = 0; j < PTime.size(); j++){
+		        if(PX[j] > -170 and PX[j] < 170){
+		          double ptime = PTime[j];
+		          int idx = int((ptime - timeStart) / timeGap);
+		          if(idx < pointInfo.size()){
+		          	// if(idx == 0){cnt2++;}
+		            pointInfo[idx].push_back(P(TIdx[j],PX[j],PY[j],PIdx[j]));
+		          }
+		          // idx->SetValue(PIdx[j],PTime[j]);
+		        }
+		      }
+
+		      // std::cout << "cnt2: " << cnt2 << std::endl;
+		    }
+		  }
+		  // std::cout << "cnt1: " << cnt1 << std::endl;
+		  // std::cout << "Total size: " << pointInfo[0].size() << std::endl;
+		  for(int i = 0; i < pointInfo.size(); i++){
+		  	std::cout << i << ' ' << pointInfo[i].size() << std::endl;
+			  for(int j = 0; j < pointInfo[i].size(); j++){
+			  	idx->SetValue(pointInfo[i][j].pointId,pointInfo[i][j].trajId);
+			  }
+		  }
+		  data->GetPointData()->SetScalars(idx);
 	}
 	else{
 		auto ashIndex = data->GetPointData()->GetArray(attribute);
@@ -217,7 +237,6 @@ void readVTKFile(const char *fileName,const char *attribute)
 	aCamera->ComputeViewPlaneNormal();
 
 	renderer->AddActor(actor);
-	renderer->AddActor(BGactor);
 	renderer->AddActor2D(legend);
 	renderer->SetActiveCamera(aCamera);
 	renderer->ResetCamera();
