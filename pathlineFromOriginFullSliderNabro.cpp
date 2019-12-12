@@ -72,7 +72,7 @@ static const double GX = -17.0f; // G
 static const double GY = 64.0f; // G
 static const double delta = 3.0f;
 static const double timeDelta = 6*3600;
-static const long slideGap = 5*3600;
+static const long slideGap = 6*3600;
 static const long timeGap = 3600;
 static const long timemax = 30*24*3600;
 static const long timePath = 6*3600;
@@ -211,7 +211,7 @@ public:
 		newindex->SetNumberOfValues(data->GetNumberOfPoints());
 		for(int i = 0; i < data->GetNumberOfPoints(); i++){newindex->InsertNextValue(0);}
 		// std::cout << "Start traverse map...\n";
-		for(std::map<long,std::vector<Node>>::iterator itrm = timeLine.lower_bound(longnow); itrm != timeLine.lower_bound(longnow + timePath); itrm++){
+		for(std::map<long,std::vector<Node>>::iterator itrm = timeLine.begin(); itrm != timeLine.lower_bound(longnow); itrm++){
 			// std::cout << "retrieve time: " <<  itrm->first << ' ';
 			for(std::vector<Node>::iterator itrv = itrm->second.begin(); itrv != itrm->second.end(); itrv++){
 				newindex->SetValue((*itrv).id,(*itrv).alt);

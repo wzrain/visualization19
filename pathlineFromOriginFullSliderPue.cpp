@@ -47,41 +47,24 @@
 #include <vector>
 #include <cmath>
 
-// 361224000
-// 361245600
-
 using namespace std;
-
-struct Node{
-	vtkIdType id;
-	double alt;
-	Node(){}
-	Node(vtkIdType i, double t){id=i;alt=t;}
-};
 
 const int time_interval = 86400;
 static const long timeStart = 360460800; // P
 static const long timeEnd = 367664384; // P
 // static const long timeStart = 361217800; // N
 // static const long timeEnd = 368582384; // N
-// static const double X = -72.0f; // P
-// static const double Y = -40.0f; // P
-static const double NX = 41.0f; // N
-static const double NY = 13.0f; // N
-static const double GX = -17.0f; // G
-static const double GY = 64.0f; // G
+static const double X = -72.0f; // P
+static const double Y = -40.0f; // P
+// static const double X = 41.0f; // N
+// static const double Y = 13.0f; // N
 static const double delta = 3.0f;
 static const double timeDelta = 6*3600;
-static const long slideGap = 5*3600;
+static const long slideGap = 6*3600;
 static const long timeGap = 3600;
 static const long timemax = 30*24*3600;
 static const long timePath = 6*3600;
-double visualMin;
-double visualMax;
-#define visualRange (visualMax-visualMin)
-// std::vector<bool> pointBool(1447514, false);
-std::vector<int> pointBool(24000661,0); // G
-std::map<long,std::vector<Node>> timeLine;
+std::vector<bool> pointBool(1447514, false);
 
 double timeStartHour(double h){
 	return timeStart + h * 3600;
@@ -102,31 +85,21 @@ void getColorCorrespondingTovalue(double val, double& r, double& g, double& b, d
 		// 156 / 255.0,81 / 255.0,8 / 255.0,
 		// 107 / 255.0,48 / 255.0,8 / 255.0
 
-		// 255 / 255.0,255 / 255.0,255 / 255.0,
-		// 254 / 255.0,224 / 255.0,210 / 255.0,
-		// 252 / 255.0,187 / 255.0,161 / 255.0,
-		// 252 / 255.0,146 / 255.0,114 / 255.0,
-		// 251 / 255.0,106 / 255.0,74 / 255.0,
-		// 239 / 255.0,59 / 255.0,44 / 255.0,
-		// 203 / 255.0,24 / 255.0,29 / 255.0,
-		// 165 / 255.0,15 / 255.0,21 / 255.0,
-		// 103 / 255.0,0 / 255.0,13 / 255.0,
-
-		178.0 / 255.0,24.0 / 255.0,43.0 / 255.0,
-		214.0 / 255.0,96.0 / 255.0,77.0 / 255.0,
-		244.0 / 255.0,165.0 / 255.0,130.0 / 255.0,
-		253.0 / 255.0,219.0 / 255.0,199.0 / 255.0,
-		255.0 / 255.0,255.0 / 255.0,255.0 / 255.0,
-		209.0 / 255.0,229.0 / 255.0,240.0 / 255.0,
-		146.0 / 255.0,197.0 / 255.0,222.0 / 255.0,
-		67.0 / 255.0,147.0 / 255.0,195.0 / 255.0,
-		33.0 / 255.0,102.0 / 255.0,172.0 / 255.0,
+		255 / 255.0,255 / 255.0,255 / 255.0,
+		254 / 255.0,224 / 255.0,210 / 255.0,
+		252 / 255.0,187 / 255.0,161 / 255.0,
+		252 / 255.0,146 / 255.0,114 / 255.0,
+		251 / 255.0,106 / 255.0,74 / 255.0,
+		239 / 255.0,59 / 255.0,44 / 255.0,
+		203 / 255.0,24 / 255.0,29 / 255.0,
+		165 / 255.0,15 / 255.0,21 / 255.0,
+		103 / 255.0,0 / 255.0,13 / 255.0,
 	};
 
 	for (int i = 0; i < (numColorNodes - 1); i++)
 	{
-		double currFloor = visualMin + ((double)i / (numColorNodes - 1)) * visualRange;
-		double currCeil = visualMin + ((double)(i + 1) / (numColorNodes - 1)) * visualRange;
+		double currFloor = 0 + ((double)i / (numColorNodes - 1)) * range;
+		double currCeil = 0 + ((double)(i + 1) / (numColorNodes - 1)) * range;
 
 		if ((val >= currFloor) && (val <= currCeil))
 		{
@@ -202,29 +175,20 @@ public:
 		double timerange[2];
 		times->GetRange(timerange, 0);
 		longnow += timerange[0];
-		// std::cout << "longNow: " << longnow << std::endl;
-		// std::cout << "timeEnd: " << longnow + timePath << std::endl;
 
 		auto altitude = data->GetPointData()->GetArray("altitude");
 
 		vtkSmartPointer<vtkFloatArray> newindex = vtkSmartPointer<vtkFloatArray>::New();
-		newindex->SetNumberOfValues(data->GetNumberOfPoints());
-		for(int i = 0; i < data->GetNumberOfPoints(); i++){newindex->InsertNextValue(0);}
-		// std::cout << "Start traverse map...\n";
-		for(std::map<long,std::vector<Node>>::iterator itrm = timeLine.lower_bound(longnow); itrm != timeLine.lower_bound(longnow + timePath); itrm++){
-			// std::cout << "retrieve time: " <<  itrm->first << ' ';
-			for(std::vector<Node>::iterator itrv = itrm->second.begin(); itrv != itrm->second.end(); itrv++){
-				newindex->SetValue((*itrv).id,(*itrv).alt);
+		newindex->SetNumberOfComponents(1);
+		for (int i = 0; i < data->GetNumberOfPoints(); i++){
+			double time = times->GetTuple1(i);
+			if(time <= longnow and pointBool[i]){
+				newindex->InsertNextValue(altitude->GetTuple1(i) + 2);
+			}
+			else{
+				newindex->InsertNextValue(0);
 			}
 		}
-		// std::cout << "End traverse map...\n";
-		// std::cout << std::endl;
-		// for(int i = 0; i < data->GetNumberOfPoints(); i++){
-		// 	double time = times->GetTuple1(i);
-		// 	if(time >= longnow and time < longnow + timePath){
-		// 		newindex->SetValue(i,pointBool[i] * (altitude->GetTuple1(i)+2));
-		// 	}
-		// }
 		data->GetPointData()->SetScalars(newindex);
 	}
 	vtkSliderCallbackclams() : data(0) {}
@@ -340,7 +304,7 @@ void readVTKFile()
 
 	// clams	
 	vtkSmartPointer<vtkPolyDataReader> clamsreader = vtkSmartPointer<vtkPolyDataReader>::New();
-	clamsreader->SetFileName("../../../clams/CLaMS_Nabro.vtk");
+	clamsreader->SetFileName("../../../clams/CLaMS_Puyehue.vtk");
 	clamsreader->Update();
 	vtkSmartPointer<vtkPolyData> clamsdata = clamsreader->GetOutput();
 
@@ -364,52 +328,33 @@ void readVTKFile()
 		std::vector<vtkIdType> PIdx;
 		std::vector<double> PX;
 		std::vector<double> PY;
-		std::vector<double> PTime;
-		std::vector<double> PAlt;
 		int timeMinId = -1;
 		double timeMin = -1;
-		int near = 0;
 		for(int j = 0; j < pointNum; j++){
 			double pTime = times->GetTuple1(clamsdata->GetCell(i)->GetPointId(j)); 
-			double pAlt = altitude->GetTuple1(clamsdata->GetCell(i)->GetPointId(j)); 
-			double co[3]; clamsdata->GetPoints()->GetPoint(clamsdata->GetCell(i)->GetPointId(j),co);
-			if(j == 0){
-			 	if((std::abs(co[0]-NX) > delta or std::abs(co[1]-NY) > delta) and (std::abs(co[0]-GX) > delta or std::abs(co[1]-GY) > delta)){break;}
-			 	else{
-					if((std::abs(co[0]-NX) <= delta and std::abs(co[1]-NY) <= delta)){near = 1;}
-					else{near = -1;}
-				}
-			}
+			double co[3];
+			clamsdata->GetPoints()->GetPoint(clamsdata->GetCell(i)->GetPointId(j),co);
 			PIdx.push_back(clamsdata->GetCell(i)->GetPointId(j));
 			PX.push_back(co[0]);
 			PY.push_back(co[1]);
-			PTime.push_back(pTime);
-			PAlt.push_back(pAlt);
+			if(timeMin < 0 or timeMin > pTime){
+				timeMin = pTime;
+				timeMinId = j;
+			}
 		}
-		if(near){
+		double x = PX[timeMinId], y = PY[timeMinId];
+		if(std::abs(x-X) < delta and std::abs(y-Y) < delta){
 			for(int j = 0; j < PX.size(); j++){
 				if(PX[j] > -170 and PX[j] < 170){
-					pointBool[PIdx[j]] = near;
-					timeLine[PTime[j]].push_back(Node(PIdx[j],near*PAlt[j]));
-					// std::cout << "Entry: " << PTime[j] << ' ' << PIdx[j] << ' ' << near*PAlt[j] << std::endl;
+					pointBool[PIdx[j]] = true;
 				}
 			}
 		}
 	}
-
-	// for(std::map<long,std::vector<Node>>::iterator itrm = timeLine.lower_bound(longnow); itrm != timeLine.lower_bound(longnow + timePath); itrm++){
-	// 	// std::cout << "retrieve time: " <<  itrm->first << ' ';
-	// 	for(std::vector<Node>::iterator itrv = itrm->second.begin(); itrv != itrm->second.end(); itrv++){
-	// 		//newindex->SetValue((*itrv).id,(*itrv).alt);
-	// 	}
-	// }
-
-	// std::cout << "total time: " << timeLine.size() << std::endl;
 	clamsdata->GetPointData()->SetScalars(newindex);
 
 	// look up table
 	double range = altirange[1] + 2;
-	visualMin = -range; visualMax = range;
 	int numColors = 256;
 	vtkSmartPointer<vtkLookupTable> clamslut = vtkSmartPointer<vtkLookupTable>::New();
 	clamslut->SetNumberOfTableValues(256);
@@ -417,7 +362,7 @@ void readVTKFile()
 	double r, g, b;
 	for (int i = 0; i < numColors; i++)
 	{
-		double val = visualMin + ((double)i / numColors) * visualRange;
+		double val = 0 + ((double)i / numColors) * range;
 		getColorCorrespondingTovalue(val, r, g, b, range);
 		if (r == 1 && g == 1 && b == 1) { clamslut->SetTableValue(i, r, g, b, 0.0); }
 		else { clamslut->SetTableValue(i, r, g, b, 1.0); }
@@ -428,7 +373,7 @@ void readVTKFile()
 	clamsmapper->SetInputData(clamsdata);
 	clamsmapper->SetLookupTable(clamslut);
 	clamsmapper->UseLookupTableScalarRangeOff();
-	clamsmapper->SetScalarRange(visualMin,visualMax);
+	clamsmapper->SetScalarRange(0, altirange[1] + 2);
 
 	// actor
 	vtkSmartPointer<vtkActor> clamsactor = vtkSmartPointer<vtkActor>::New();

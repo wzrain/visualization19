@@ -46,7 +46,7 @@
 #include <iostream>
 #include <vector>
 #include <cmath>
-
+#include <unordered_set>
 // 361224000
 // 361245600
 
@@ -212,7 +212,7 @@ public:
 		for(int i = 0; i < data->GetNumberOfPoints(); i++){newindex->InsertNextValue(0);}
 		// std::cout << "Start traverse map...\n";
 		for(std::map<long,std::vector<Node>>::iterator itrm = timeLine.lower_bound(longnow); itrm != timeLine.lower_bound(longnow + timePath); itrm++){
-			// std::cout << "retrieve time: " <<  itrm->first << ' ';
+			// std::cout << "  retrieve time: " <<  itrm->first << ' ';
 			for(std::vector<Node>::iterator itrv = itrm->second.begin(); itrv != itrm->second.end(); itrv++){
 				newindex->SetValue((*itrv).id,(*itrv).alt);
 			}
@@ -358,58 +358,51 @@ void readVTKFile()
 
 	vtkSmartPointer<vtkFloatArray> newindex = vtkSmartPointer<vtkFloatArray>::New();
 	newindex->SetNumberOfValues(clamsdata->GetNumberOfPoints());
+	visualMin = 0; visualMax = 0;
 	for(int i = 0; i < clamsdata->GetNumberOfPoints(); i++){newindex->InsertNextValue(0);}
 	for(int i = 0; i < trajs->GetNumberOfTuples(); i++){
+		if(i % 5000 == 0){std::cout << i << std::endl;}
+		// if(i > 2000){break;}
 		int pointNum = clamsdata->GetCell(i)->GetPointIds()->GetNumberOfIds();
-		std::vector<vtkIdType> PIdx;
-		std::vector<double> PX;
-		std::vector<double> PY;
-		std::vector<double> PTime;
-		std::vector<double> PAlt;
-		int timeMinId = -1;
-		double timeMin = -1;
 		int near = 0;
 		for(int j = 0; j < pointNum; j++){
 			double pTime = times->GetTuple1(clamsdata->GetCell(i)->GetPointId(j)); 
+			if(pTime > timerange[0] + 420*3600){break;}
 			double pAlt = altitude->GetTuple1(clamsdata->GetCell(i)->GetPointId(j)); 
 			double co[3]; clamsdata->GetPoints()->GetPoint(clamsdata->GetCell(i)->GetPointId(j),co);
-			if(j == 0){
-			 	if((std::abs(co[0]-NX) > delta or std::abs(co[1]-NY) > delta) and (std::abs(co[0]-GX) > delta or std::abs(co[1]-GY) > delta)){break;}
-			 	else{
-					if((std::abs(co[0]-NX) <= delta and std::abs(co[1]-NY) <= delta)){near = 1;}
-					else{near = -1;}
+			if(near){
+				if(co[0] > -170 and co[0] < 170){
+					timeLine[pTime].push_back(Node(clamsdata->GetCell(i)->GetPointId(j),near*(pAlt+2)));
+					if(near*(pAlt+2) < visualMin){visualMin = near*(pAlt+2);}
+					if(near*(pAlt+2) > visualMax){visualMax = near*(pAlt+2);}
 				}
 			}
-			PIdx.push_back(clamsdata->GetCell(i)->GetPointId(j));
-			PX.push_back(co[0]);
-			PY.push_back(co[1]);
-			PTime.push_back(pTime);
-			PAlt.push_back(pAlt);
-		}
-		if(near){
-			for(int j = 0; j < PX.size(); j++){
-				if(PX[j] > -170 and PX[j] < 170){
-					pointBool[PIdx[j]] = near;
-					timeLine[PTime[j]].push_back(Node(PIdx[j],near*PAlt[j]));
-					// std::cout << "Entry: " << PTime[j] << ' ' << PIdx[j] << ' ' << near*PAlt[j] << std::endl;
+			else{
+				if(std::abs(co[0]-NX) <= delta and std::abs(co[1]-NY) <= delta){
+					near = 1;
+					if(co[0] > -170 and co[0] < 170){
+						timeLine[pTime].push_back(Node(clamsdata->GetCell(i)->GetPointId(j),near*(pAlt+2)));
+						if(near*(pAlt+2) < visualMin){visualMin = near*(pAlt+2);}
+						if(near*(pAlt+2) > visualMax){visualMax = near*(pAlt+2);}
+					}
+				}
+				if(std::abs(co[0]-GX) <= delta and std::abs(co[1]-GY) <= delta){
+					near = -1;
+					if(co[0] > -170 and co[0] < 170){
+						timeLine[pTime].push_back(Node(clamsdata->GetCell(i)->GetPointId(j),near*(pAlt+2)));
+						if(near*(pAlt+2) < visualMin){visualMin = near*(pAlt+2);}
+						if(near*(pAlt+2) > visualMax){visualMax = near*(pAlt+2);}
+					}
 				}
 			}
 		}
 	}
-
-	// for(std::map<long,std::vector<Node>>::iterator itrm = timeLine.lower_bound(longnow); itrm != timeLine.lower_bound(longnow + timePath); itrm++){
-	// 	// std::cout << "retrieve time: " <<  itrm->first << ' ';
-	// 	for(std::vector<Node>::iterator itrv = itrm->second.begin(); itrv != itrm->second.end(); itrv++){
-	// 		//newindex->SetValue((*itrv).id,(*itrv).alt);
-	// 	}
-	// }
-
-	// std::cout << "total time: " << timeLine.size() << std::endl;
+	if(std::abs(visualMin) > std::abs(visualMax)){visualMax = -visualMin;}
+	else{visualMin = -visualMax;}
 	clamsdata->GetPointData()->SetScalars(newindex);
 
 	// look up table
 	double range = altirange[1] + 2;
-	visualMin = -range; visualMax = range;
 	int numColors = 256;
 	vtkSmartPointer<vtkLookupTable> clamslut = vtkSmartPointer<vtkLookupTable>::New();
 	clamslut->SetNumberOfTableValues(256);
@@ -428,7 +421,7 @@ void readVTKFile()
 	clamsmapper->SetInputData(clamsdata);
 	clamsmapper->SetLookupTable(clamslut);
 	clamsmapper->UseLookupTableScalarRangeOff();
-	clamsmapper->SetScalarRange(visualMin,visualMax);
+	clamsmapper->SetScalarRange(visualMin/2.0,visualMax/2.0);
 
 	// actor
 	vtkSmartPointer<vtkActor> clamsactor = vtkSmartPointer<vtkActor>::New();
