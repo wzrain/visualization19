@@ -7,7 +7,6 @@
 #include <vtkSphereSource.h>
 #include <vtkButtonWidget.h>
 #include <vtkTexturedButtonRepresentation2D.h>
-
 #include <vtkSmartPointer.h>
 #include <vtkMetaImageReader.h>
 #include <vtkMarchingCubes.h>
@@ -42,6 +41,7 @@
 #include <vtkRegularPolygonSource.h>
 #include <vtkGlyph2D.h>
 
+#include <set>
 #include <string>
 #include <iostream>
 #include <vector>
@@ -50,22 +50,23 @@
 using namespace std;
 
 const int time_interval = 86400;
-// static const long timeStart = 360460800; // P
-// static const long timeEnd = 367664384; // P
-static const long timeStart = 361216800; // N
-static const long timeEnd = 368582400; // N
+static const long timeStart = 360460800; // P
+static const long timeEnd = 367664384; // P
+// static const long timeStart = 361217800; // N
+// static const long timeEnd = 368582384; // N
 // static const double X = -72.0f; // P
 // static const double Y = -40.0f; // P
 static const double X = 41.0f; // N
 static const double Y = 13.0f; // N
 // static const double X = 17.0f; // G
 // static const double Y = 64.0f; // G
-static const double delta = 2.0f;
-static const double timeDelta = 12 * 3600;
+static const double delta = 10.0f;
+static const double timeDelta = 6 * 3600;
 static const long slideGap = 6*3600;
 static const long timeGap = 3600;
 static const long timemax = 30*24*3600;
-// std::vector<bool> pointBool(1447514, false); // N
+static const long timePath = 6*3600;
+// std::vector<bool> pointBool(1447514, false);
 std::vector<bool> pointBool(24000661,false); // G
 
 double timeStartHour(double h){
@@ -183,7 +184,7 @@ public:
 		newindex->SetNumberOfComponents(1);
 		for (int i = 0; i < data->GetNumberOfPoints(); i++){
 			double time = times->GetTuple1(i);
-			if (time < longnow and pointBool[i]){
+			if(time >= longnow and time < longnow + timePath and pointBool[i]){
 				newindex->InsertNextValue(altitude->GetTuple1(i) + 2);
 			}
 			else{
@@ -316,13 +317,11 @@ void readVTKFile()
 	auto times = clamsdata->GetPointData()->GetArray("time");
 	double timerange[2];
 	times->GetRange(timerange, 0);
-	std::cout << long(timerange[0]) << ' ' << long(timerange[1]) << std::endl;
 
 	auto altitude = clamsdata->GetPointData()->GetArray("altitude");
 	double altirange[2];
 	altitude->GetRange(altirange, 0);
 
-	std::cout << clamsdata->GetNumberOfPoints() << std::endl;
 	vtkSmartPointer<vtkFloatArray> newindex = vtkSmartPointer<vtkFloatArray>::New();
 	newindex->SetNumberOfValues(clamsdata->GetNumberOfPoints());
 	for(int i = 0; i < clamsdata->GetNumberOfPoints(); i++){newindex->InsertNextValue(0);}
@@ -330,17 +329,18 @@ void readVTKFile()
 		int pointNum = clamsdata->GetCell(i)->GetPointIds()->GetNumberOfIds();
 		std::vector<vtkIdType> PIdx;
 		std::vector<double> PX;
-		bool near = false;
+		std::vector<double> PY;
+		int timeMinId = -1;
+		double timeMin = -1;
+		bool near = true;
 		for(int j = 0; j < pointNum; j++){
 			double pTime = times->GetTuple1(clamsdata->GetCell(i)->GetPointId(j)); 
 			double co[3];
 			clamsdata->GetPoints()->GetPoint(clamsdata->GetCell(i)->GetPointId(j),co);
-			if(!near and std::abs(co[0]-X) < delta and std::abs(co[1]-Y) < delta and pTime < timerange[0] + timeDelta){near = true;}
-			if(i == 0){
-				std::cout << long(pTime) << std::endl;
-			}
+			if(j == 0 and (std::abs(co[0]-X) > delta or std::abs(co[1]-Y) > delta)){near=false;break;}
 			PIdx.push_back(clamsdata->GetCell(i)->GetPointId(j));
 			PX.push_back(co[0]);
+			PY.push_back(co[1]);
 		}
 		if(near){
 			for(int j = 0; j < PX.size(); j++){
@@ -349,6 +349,10 @@ void readVTKFile()
 				}
 			}
 		}
+		// double x = PX[timeMinId], y = PY[timeMinId];
+		// if(std::abs(x-X) < delta and std::abs(y-Y) < delta){
+			
+		// }
 	}
 	clamsdata->GetPointData()->SetScalars(newindex);
 
