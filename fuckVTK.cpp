@@ -53,22 +53,16 @@
 using namespace std;
 
 struct Node{
-	vtkIdType id;
+	vtkIdType pid, tid;
 	double alt;
+	bool above;
 	Node(){}
-	Node(vtkIdType i, double t){id=i;alt=t;}
-};
-
-struct Node2{
-	vtkIdType id;
-	bool alt;
-	Node2(){}
-	Node2(vtkIdType i, bool t=false){id=i;alt=t;}
+	Node(vtkIdType pi, vtkIdType ti, double t, bool flag){pid=pi;tid=ti;alt=t;above=flag;}
 };
 
 const int time_interval = 86400;
-static const long timeStart = 360460800; // P
-static const long timeEnd = 367664384; // P
+// static const long timeStart = 360460800; // P
+// static const long timeEnd = 367664384; // P
 // static const long timeStart = 361217800; // N
 // static const long timeEnd = 368582384; // N
 // static const double X = -72.0f; // P
@@ -85,10 +79,12 @@ static const long timemax = 30*24*3600;
 static const long timePath = 6*3600;
 double visualMin;
 double visualMax;
+long timeStart, timeEnd;
 #define visualRange (visualMax-visualMin)
 // std::vector<bool> pointBool(1447514, false);
 std::vector<int> pointBool(24000661,0); // G
 std::map<long,std::vector<Node>> timeLine;
+std::vector<long> trajStartTime;
 
 double timeStartHour(double h){
 	return timeStart + h * 3600;
@@ -99,16 +95,6 @@ void getColorCorrespondingTovalue(double val, double& r, double& g, double& b, d
 	static const int numColorNodes = 9;
 	double color[numColorNodes][3] =
 	{
-		// 255 / 255.0,255 / 255.0,255 / 255.0,
-		// 247 / 255.0,235 / 255.0,222 / 255.0,
-		// 239 / 255.0,219 / 255.0,198 / 255.0,
-		// 225 / 255.0,202 / 255.0,158 / 255.0,
-		// 214 / 255.0,174 / 255.0,107 / 255.0,
-		// 198 / 255.0,146 / 255.0,66 / 255.0,
-		// 181 / 255.0,113 / 255.0,33 / 255.0,
-		// 156 / 255.0,81 / 255.0,8 / 255.0,
-		// 107 / 255.0,48 / 255.0,8 / 255.0
-
 		255 / 255.0,255 / 255.0,255 / 255.0,
 		254 / 255.0,224 / 255.0,210 / 255.0,
 		252 / 255.0,187 / 255.0,161 / 255.0,
@@ -118,16 +104,6 @@ void getColorCorrespondingTovalue(double val, double& r, double& g, double& b, d
 		203 / 255.0,24 / 255.0,29 / 255.0,
 		165 / 255.0,15 / 255.0,21 / 255.0,
 		103 / 255.0,0 / 255.0,13 / 255.0,
-
-		// 178.0 / 255.0,24.0 / 255.0,43.0 / 255.0,
-		// 214.0 / 255.0,96.0 / 255.0,77.0 / 255.0,
-		// 244.0 / 255.0,165.0 / 255.0,130.0 / 255.0,
-		// 253.0 / 255.0,219.0 / 255.0,199.0 / 255.0,
-		// 255.0 / 255.0,255.0 / 255.0,255.0 / 255.0,
-		// 209.0 / 255.0,229.0 / 255.0,240.0 / 255.0,
-		// 146.0 / 255.0,197.0 / 255.0,222.0 / 255.0,
-		// 67.0 / 255.0,147.0 / 255.0,195.0 / 255.0,
-		// 33.0 / 255.0,102.0 / 255.0,172.0 / 255.0,
 	};
 
 	for (int i = 0; i < (numColorNodes - 1); i++)
@@ -209,20 +185,29 @@ public:
 		double timerange[2];
 		times->GetRange(timerange, 0);
 		longnow += timerange[0];
-		// std::cout << "longNow: " << longnow << std::endl;
-		// std::cout << "timeEnd: " << longnow + timePath << std::endl;
 
-		auto altitude = data->GetPointData()->GetArray("altitude");
+		// auto altitude = data->GetPointData()->GetArray("altitude");
+
+		std::unordered_set<int> hasBelow, hasAbove, selected;
 
 		vtkSmartPointer<vtkFloatArray> newindex = vtkSmartPointer<vtkFloatArray>::New();
 		newindex->SetNumberOfValues(data->GetNumberOfPoints());
 		for(int i = 0; i < data->GetNumberOfPoints(); i++){newindex->InsertNextValue(0);}
 		for(std::map<long,std::vector<Node>>::iterator itrm = timeLine.lower_bound(longnow); itrm != timeLine.lower_bound(longnow + timePath); itrm++){
-			// std::cout << "  retrieve time: " <<  itrm->first << ' ';
 			for(std::vector<Node>::iterator itrv = itrm->second.begin(); itrv != itrm->second.end(); itrv++){
-				if((*itrv).alt){
-					newindex->SetValue((*itrv).id,1);
-				}
+				bool flag = (*itrv).above;
+				if(longnow <= trajStartTime[(*itrv).tid]){hasBelow.insert((*itrv).tid);}
+
+				if(flag){hasAbove.insert((*itrv).tid);}
+				else{hasBelow.insert((*itrv).tid);}
+			}
+		}
+		for(std::unordered_set<int>::iterator itrs = hasBelow.begin(); itrs != hasBelow.end(); itrs++){
+			if(hasAbove.find(*itrs) != hasAbove.end()){selected.insert(*itrs);}
+		}
+		for(std::map<long,std::vector<Node>>::iterator itrm = timeLine.lower_bound(longnow); itrm != timeLine.lower_bound(longnow + timePath); itrm++){
+			for(std::vector<Node>::iterator itrv = itrm->second.begin(); itrv != itrm->second.end(); itrv++){
+				if(selected.find((*itrv).tid) != selected.end()){newindex->SetValue((*itrv).pid,(*itrv).alt);}
 			}
 		}
 		data->GetPointData()->SetScalars(newindex);
@@ -351,6 +336,7 @@ void readVTKFile()
 	auto times = clamsdata->GetPointData()->GetArray("time");
 	double timerange[2];
 	times->GetRange(timerange, 0);
+	timeStart = timerange[0]; timeEnd = timerange[1];
 
 	auto altitude = clamsdata->GetPointData()->GetArray("altitude");
 	double altirange[2];
@@ -383,99 +369,54 @@ void readVTKFile()
 			tropo_data->GetPoints()->GetPoint(i, xyz);
 			txya[tm][xyz[0]][xyz[1]] = tropo_1->GetTuple1(i);
 
-			if(tropo_1->GetTuple1(i) == 0) 
-				std::cout<<"fuck======\n";
 		}
 		tropo_data->GetPointData()->SetScalars(tropo_1);
 		tropo_vec.push_back(tropo_data);
 	}
 
+	visualMin = 0; visualMax = 0;
 	vtkSmartPointer<vtkFloatArray> newindex = vtkSmartPointer<vtkFloatArray>::New();
 	newindex->SetNumberOfValues(clamsdata->GetNumberOfPoints());
-	double oldAlt = 0;
 	for(int i = 0; i < clamsdata->GetNumberOfPoints(); i++){newindex->InsertNextValue(0);}
+
+	
 	for(int i = 0; i < trajs->GetNumberOfTuples(); i++){
-		// if(i % 5000 == 0){std::cout << i << std::endl;}
-		if(i > 30000){break;}
+		if(i % 5000 == 0){std::cout << i << std::endl;}
+		// if(i > 2000){break;}
 		int pointNum = clamsdata->GetCell(i)->GetPointIds()->GetNumberOfIds();
-		int near = 0;
+		bool near = false;
+		double alt, oldAlt = 0;
+		long sTime = 0;
 		for(int j = 0; j < pointNum; j++){
-			double pTime = times->GetTuple1(clamsdata->GetCell(i)->GetPointId(j)); 
-			if(pTime > timerange[0] + 420*3600){break;}
+			double pTime = times->GetTuple1(clamsdata->GetCell(i)->GetPointId(j)); if(pTime > timerange[0] + 420*3600){break;}
 			double pAlt = altitude->GetTuple1(clamsdata->GetCell(i)->GetPointId(j)); 
 			double co[3]; clamsdata->GetPoints()->GetPoint(clamsdata->GetCell(i)->GetPointId(j),co);
-			// std::cout << "alt: " << txya[(int)pTime][(int)co[0]][(int)co[1]] << std::endl;
-			// if(!txya[(int)pTime][(int)co[0]][(int)co[1]]){
-			bool flag = true;
-			double alt = 0;
-			if(txya.find(pTime) == txya.end()){
-				// std::cout<<"no time find=============\n";
-				// std::cout<<pTime<<" no such time===\n";
-				// continue;
-				alt = oldAlt;
-				// flag = false;
-			}
-			else if (txya[pTime].find((int)co[0]) == txya[pTime].end()) {
-				// std::cout<<"no x find ================\n";
-				// std::cout<<(int)co[0]<<" no such x=====\n";
-				// continue;
-				// flag = false;
-				alt = oldAlt;
-			}
-			else if (txya[pTime][(int)co[0]].find((int)co[1]) == txya[pTime][(int)co[0]].end()) {
-				// std::cout<<"no y find======\n";
-				// std::cout<<(int)co[1]<<" no such y=====\n";
-				// continue;
-				// flag = false;
-				alt = oldAlt;
-			}
+			if(txya.find(pTime) == txya.end()){alt = oldAlt;}
+			else if (txya[pTime].find((int)co[0]) == txya[pTime].end()){alt = oldAlt;}
+			else if (txya[pTime][(int)co[0]].find((int)co[1]) == txya[pTime][(int)co[0]].end()){alt = oldAlt;}
 			else alt = txya[(int)pTime][(int)co[0]][(int)co[1]];
 			oldAlt = alt;
-			if(pAlt >= alt){
-				timeLine[pTime].push_back(Node(clamsdata->GetCell(i)->GetPointId(j),true));
+			if(near){
+				if(co[0] > -170 and co[0] < 170){
+					timeLine[pTime].push_back(Node(clamsdata->GetCell(i)->GetPointId(j),i,pAlt+2,(pAlt>alt)));
+					if(pAlt+2 > visualMax){visualMax = pAlt+2;}
+				}
 			}
 			else{
-				timeLine[pTime].push_back(Node(clamsdata->GetCell(i)->GetPointId(j),false));
+				if(std::abs(co[0]-NX) <= delta and std::abs(co[1]-NY) <= delta){
+					near = true; sTime = pTime;
+					if(co[0] > -170 and co[0] < 170){
+						timeLine[pTime].push_back(Node(clamsdata->GetCell(i)->GetPointId(j),i,pAlt+2,(pAlt>alt)));
+						if(pAlt+2 > visualMax){visualMax = pAlt+2;}
+					}
+				}
 			}
-
-			// else {
-			// 	std::cout<<"rubbish value====\n";
-			// }
-			// std::cout << "Some situation: " << pTime << ' ' << co[0] << ' ' <<  co[1] << std::endl;
-			// }
-			// if(near){
-			// 	if(co[0] > -170 and co[0] < 170 and flag and pAlt >= txya[pTime][co[0]][co[1]]){
-			// 		timeLine[pTime].push_back(Node(clamsdata->GetCell(i)->GetPointId(j),near*(pAlt+2)));
-			// 		if(near*(pAlt+2) < visualMin){visualMin = near*(pAlt+2);}
-			// 		if(near*(pAlt+2) > visualMax){visualMax = near*(pAlt+2);}
-			// 	}
-			// }
-			// else{
-			// 	if(std::abs(co[0]-NX) <= delta and std::abs(co[1]-NY) <= delta){
-			// 		near = 1;
-			// 		if(co[0] > -170 and co[0] < 170 and flag and pAlt >= txya[pTime][co[0]][co[1]]){
-			// 			timeLine[pTime].push_back(Node(clamsdata->GetCell(i)->GetPointId(j),near*(pAlt+2)));
-			// 			if(near*(pAlt+2) < visualMin){visualMin = near*(pAlt+2);}
-			// 			if(near*(pAlt+2) > visualMax){visualMax = near*(pAlt+2);}
-			// 		}
-			// 	}
-			// 	if(std::abs(co[0]-GX) <= delta and std::abs(co[1]-GY) <= delta){
-			// 		near = -1;
-			// 		if(co[0] > -170 and co[0] < 170 and flag and  pAlt >= txya[pTime][co[0]][co[1]]){
-			// 			timeLine[pTime].push_back(Node(clamsdata->GetCell(i)->GetPointId(j),near*(pAlt+2)));
-			// 			if(near*(pAlt+2) < visualMin){visualMin = near*(pAlt+2);}
-			// 			if(near*(pAlt+2) > visualMax){visualMax = near*(pAlt+2);}
-			// 		}
-			// 	}
-			// }
 		}
+		trajStartTime.push_back(sTime);
 	}
-	// if(std::abs(visualMin) > std::abs(visualMax)){visualMax = -visualMin;}
-	// else{visualMin = -visualMax;}
 	clamsdata->GetPointData()->SetScalars(newindex);
 
 	// look up table
-	visualMin = 0; visualMax = 1;
 	double range = altirange[1] + 2;
 	int numColors = 256;
 	vtkSmartPointer<vtkLookupTable> clamslut = vtkSmartPointer<vtkLookupTable>::New();
@@ -495,7 +436,7 @@ void readVTKFile()
 	clamsmapper->SetInputData(clamsdata);
 	clamsmapper->SetLookupTable(clamslut);
 	clamsmapper->UseLookupTableScalarRangeOff();
-	clamsmapper->SetScalarRange(visualMin,visualMax);
+	clamsmapper->SetScalarRange(visualMin/2.0,visualMax/2.0);
 
 	// actor
 	vtkSmartPointer<vtkActor> clamsactor = vtkSmartPointer<vtkActor>::New();
