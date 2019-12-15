@@ -76,13 +76,14 @@ static const double timeDelta = 6*3600;
 static const long slideGap = 5*3600;
 static const long timeGap = 3600;
 static const long timemax = 30*24*3600;
-static const long timePath = 6*3600;
+static const long timePath = 5*3600;
 double visualMin;
 double visualMax;
 long timeStart, timeEnd;
 #define visualRange (visualMax-visualMin)
 // std::vector<bool> pointBool(1447514, false);
 std::vector<int> pointBool(24000661,0); // G
+std::vector<bool> trajVisited(55507,false);
 std::map<long,std::vector<Node>> timeLine;
 std::vector<long> trajStartTime;
 
@@ -193,21 +194,33 @@ public:
 		vtkSmartPointer<vtkFloatArray> newindex = vtkSmartPointer<vtkFloatArray>::New();
 		newindex->SetNumberOfValues(data->GetNumberOfPoints());
 		for(int i = 0; i < data->GetNumberOfPoints(); i++){newindex->InsertNextValue(0);}
-		for(std::map<long,std::vector<Node>>::iterator itrm = timeLine.lower_bound(longnow); itrm != timeLine.lower_bound(longnow + timePath); itrm++){
+		for(std::map<long,std::vector<Node>>::iterator itrm = timeLine.lower_bound(longnow-1800); itrm != timeLine.lower_bound(longnow + timePath); itrm++){
 			for(std::vector<Node>::iterator itrv = itrm->second.begin(); itrv != itrm->second.end(); itrv++){
-				bool flag = (*itrv).above;
-				if(longnow <= trajStartTime[(*itrv).tid]){hasBelow.insert((*itrv).tid);}
+				if(!trajVisited[(*itrv).tid]){
+					bool flag = (*itrv).above;
+					// if(longnow <= trajStartTime[(*itrv).tid]){hasBelow.insert((*itrv).tid);}
 
-				if(flag){hasAbove.insert((*itrv).tid);}
-				else{hasBelow.insert((*itrv).tid);}
+					if(flag){
+						if(hasBelow.find((*itrv).tid) != hasBelow.end()){hasAbove.insert((*itrv).tid);}
+					}
+					else{hasBelow.insert((*itrv).tid);}
+				}
 			}
 		}
-		for(std::unordered_set<int>::iterator itrs = hasBelow.begin(); itrs != hasBelow.end(); itrs++){
-			if(hasAbove.find(*itrs) != hasAbove.end()){selected.insert(*itrs);}
-		}
+		// for(std::unordered_set<int>::iterator itrs = hasBelow.begin(); itrs != hasBelow.end(); itrs++){
+		// 	if(hasAbove.find(*itrs) != hasAbove.end()){selected.insert(*itrs);}
+		// }
+		// for(std::map<long,std::vector<Node>>::iterator itrm = timeLine.lower_bound(longnow); itrm != timeLine.lower_bound(longnow + timePath); itrm++){
+		// 	for(std::vector<Node>::iterator itrv = itrm->second.begin(); itrv != itrm->second.end(); itrv++){
+		// 		if(selected.find((*itrv).tid) != selected.end() and (*itrv).pid!=-1){newindex->SetValue((*itrv).pid,(*itrv).alt);}
+		// 	}
+		// }
 		for(std::map<long,std::vector<Node>>::iterator itrm = timeLine.lower_bound(longnow); itrm != timeLine.lower_bound(longnow + timePath); itrm++){
 			for(std::vector<Node>::iterator itrv = itrm->second.begin(); itrv != itrm->second.end(); itrv++){
-				if(selected.find((*itrv).tid) != selected.end()){newindex->SetValue((*itrv).pid,(*itrv).alt);}
+				if(hasAbove.find((*itrv).tid) != hasAbove.end() and (*itrv).pid!=-1){
+					newindex->SetValue((*itrv).pid,(*itrv).alt);
+					if(!trajVisited[(*itrv).tid]){trajVisited[(*itrv).tid] = true;}
+				}
 			}
 		}
 		data->GetPointData()->SetScalars(newindex);
@@ -378,7 +391,7 @@ void readVTKFile()
 	vtkSmartPointer<vtkFloatArray> newindex = vtkSmartPointer<vtkFloatArray>::New();
 	newindex->SetNumberOfValues(clamsdata->GetNumberOfPoints());
 	for(int i = 0; i < clamsdata->GetNumberOfPoints(); i++){newindex->InsertNextValue(0);}
-
+	std::cout << trajs->GetNumberOfTuples() << std::endl;
 	
 	for(int i = 0; i < trajs->GetNumberOfTuples(); i++){
 		if(i % 5000 == 0){std::cout << i << std::endl;}
@@ -386,6 +399,7 @@ void readVTKFile()
 		int pointNum = clamsdata->GetCell(i)->GetPointIds()->GetNumberOfIds();
 		bool near = false;
 		double alt, oldAlt = 0;
+		long prevTime = timerange[0] - 1800;
 		long sTime = 0;
 		for(int j = 0; j < pointNum; j++){
 			double pTime = times->GetTuple1(clamsdata->GetCell(i)->GetPointId(j)); if(pTime > timerange[0] + 420*3600){break;}
@@ -407,10 +421,12 @@ void readVTKFile()
 					near = true; sTime = pTime;
 					if(co[0] > -170 and co[0] < 170){
 						timeLine[pTime].push_back(Node(clamsdata->GetCell(i)->GetPointId(j),i,pAlt+2,(pAlt>alt)));
+						timeLine[prevTime].push_back(Node(clamsdata->GetCell(i)->GetPointId(j),i,pAlt+2,false));
 						if(pAlt+2 > visualMax){visualMax = pAlt+2;}
 					}
 				}
 			}
+			prevTime = pTime;
 		}
 		trajStartTime.push_back(sTime);
 	}
